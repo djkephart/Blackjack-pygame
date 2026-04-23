@@ -525,4 +525,3 @@ while running:
         render()
 
 pygame.quit()
-#test
