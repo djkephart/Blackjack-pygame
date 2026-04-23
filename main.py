@@ -20,12 +20,16 @@ DEAL_DELAY = 500
 # -----------------------------
 # STATE
 # -----------------------------
-bet_screen = True
+start_screen = True
+start_input = ""
+start_error = ""
+
+bet_screen = False
 bet_input = ""
 bet_error = ""
 bet = 0
 
-chips = 500
+chips = 0
 bankrupt = False
 
 game_over = False
@@ -372,7 +376,34 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-        if bet_screen:
+        # -------- START SCREEN --------
+        if start_screen:
+
+            if event.type == pygame.KEYDOWN:
+
+                if event.key == pygame.K_BACKSPACE:
+                    start_input = start_input[:-1]
+                    start_error = ""
+
+                elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+
+                    if start_input.isdigit():
+                        value = int(start_input)
+
+                        if value <= 0:
+                            start_input = ""
+                            start_error = "Enter a valid amount"
+                            continue
+
+                        chips = value
+                        start_screen = False
+                        bet_screen = True
+
+                elif event.unicode.isdigit():
+                    start_input += event.unicode
+
+        # -------- BET SCREEN --------
+        elif bet_screen:
 
             if event.type == pygame.KEYDOWN:
 
@@ -380,7 +411,7 @@ while running:
                     bet_input = ""
                     bet_error = ""
 
-                elif event.key == pygame.K_RETURN:
+                elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
 
                     if bet_input.isdigit():
                         value = int(bet_input)
@@ -405,6 +436,7 @@ while running:
                 elif event.unicode.isdigit():
                     bet_input += event.unicode
 
+        # -------- GAME --------
         else:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
@@ -427,7 +459,6 @@ while running:
                             continue
                         dealer_play()
 
-                    # ===== ADDED DOUBLE CLICK =====
                     elif double_rect.collidepoint(mx, my):
                         if (not game_over) and (not player_locked) and len(player_hand) == 2:
                             double_down()
@@ -435,7 +466,29 @@ while running:
     # -----------------------------
     # RENDER
     # -----------------------------
-    if bet_screen:
+
+    # -------- START SCREEN --------
+    if start_screen:
+        screen.blit(table_img, (0, 0))
+
+        title_w, title_h = big_font.render("Starting Chips:", True, (255,255,255)).get_size()
+        input_w, input_h = big_font.render(start_input if start_input else " ", True, (255,255,0)).get_size()
+
+        block_width = max(title_w, input_w) + 20
+        block_height = title_h + input_h + 30
+
+        x, y = center_pos(block_width, block_height)
+
+        draw_panel("Starting Chips:", (x, y), f=big_font)
+        draw_panel(start_input, (x+75, y + title_h + 25), text_color=(255,255,0), f=big_font)
+
+        if start_error:
+            draw_panel(start_error, (520, 400), text_color=(255,0,0))
+
+        pygame.display.flip()
+
+    # -------- BET SCREEN --------
+    elif bet_screen:
         screen.blit(table_img, (0, 0))
 
         if bankrupt:
