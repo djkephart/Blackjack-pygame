@@ -213,7 +213,11 @@ def render():
 
     draw_panel(f"Player: {calculate_hand_total(player_hand)}", (590, 425))
 
-    dealer_val = calculate_hand_total(dealer_hand) if show_dealer else card_values[dealer_hand[0][0]]
+    if len(dealer_hand) > 0:
+        dealer_val = calculate_hand_total(dealer_hand) if show_dealer else card_values[dealer_hand[0][0]]
+    else:
+        dealer_val = 0    
+    
     draw_panel(f"Dealer: {dealer_val}", (590, 205))
 
     draw_panel(f"Chips: {chips}", (25, 20))
@@ -296,10 +300,11 @@ def start_round():
 
     reset_round()
 
-    deal(dealer_hand)
+    # Casino-style dealing
+    deal(player_hand)
     deal(dealer_hand)
     deal(player_hand)
-    deal(player_hand)
+    deal(dealer_hand)
 
     p_total = calculate_hand_total(player_hand)
 
@@ -315,7 +320,6 @@ def start_round():
             result = "Push"
 
         end_round(result)
-
 # -----------------------------
 # DEALER
 # -----------------------------
