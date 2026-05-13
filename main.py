@@ -305,14 +305,15 @@ def resume_after_insurance():
     p_total = calculate_hand_total(player_hand)
 
     if dealer_has_blackjack():
-
         if p_total == 21:
             chips += bet
             end_round("Push")
         else:
             end_round("Dealer Blackjack!")
+        return
 
-    elif p_total == 21:
+    # normal blackjack check after insurance
+    if p_total == 21:
         winnings = bet * 2.5
         chips += winnings
         end_round(f"Blackjack! You won {winnings} chips!")
@@ -350,7 +351,7 @@ def start_round():
     deal(player_hand)
     deal(dealer_hand)
     # FORCE DEALER UP CARD TO ACE (TESTING ONLY)
-#    dealer_hand[0] = ("Ace", dealer_hand[0][1])
+    dealer_hand[0] = ("Ace", dealer_hand[0][1])
 
 # ===== INSURANCE CHECK (ONLY IF PLAYER CAN AFFORD IT) =====
     if dealer_hand[0][0] == "Ace":
@@ -514,11 +515,11 @@ while running:
                         chips -= insurance_bet
                         insurance_screen = False
 
-                        # dealer has blackjack → insurance pays 2:1 (net +3x already includes stake return in your logic style)
                         if dealer_has_blackjack():
                             chips += insurance_bet * 3
                             end_round("Insurance Wins! Dealer Blackjack")
-                            continue
+                        else:
+                            resume_after_insurance()
 
                         continue
 
@@ -528,15 +529,7 @@ while running:
                         insurance_bet = 0
                         insurance_screen = False
 
-                        # resolve blackjack immediately if it exists
-                        if dealer_has_blackjack():
-                            p_total = calculate_hand_total(player_hand)
-
-                            if p_total == 21:
-                                chips += bet
-                                end_round("Push (Both Blackjack)")
-                            else:
-                                end_round("Dealer Blackjack!")
+                        resume_after_insurance()
 
                         continue
 
@@ -555,8 +548,15 @@ while running:
 
                         deal(player_hand)
 
-                        if calculate_hand_total(player_hand) > 21:
+                        total = calculate_hand_total(player_hand)
+
+                        if total > 21:
                             end_round("You Bust! Dealer Wins")
+
+                        elif total == 21:
+                            player_locked = True   
+                            dealer_play()
+
 
                     elif stand_rect.collidepoint(mx, my):
                         if player_locked:
