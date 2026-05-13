@@ -37,6 +37,7 @@ show_dealer = False
 end_message = ""
 
 insurance_screen = False
+insurance_hit = False
 insurance_error = ""
 insurance_bet = 0
 
@@ -231,7 +232,7 @@ def render():
     draw_panel(f"Chips: {chips}", (25, 20))
     draw_panel(f"Bet: {bet}", (25, 60))
 
-    if not game_over:
+    if not game_over and not insurance_screen:
         draw_button(hit_rect, (200,0,0), hit_text)
         draw_button(stand_rect, (0,0,200), stand_text)
 
@@ -239,7 +240,7 @@ def render():
         if len(player_hand) == 2:
             draw_button(double_rect, (200,150,0), double_text)
 
-    else:
+    elif game_over:
         size = draw_panel(end_message, (0, 0), color=(0,0,0), alpha=200, text_color=(255,255,0), f=big_font, draw=False)
         pos = center_pos(*size)
         draw_panel(end_message, pos, color=(0,0,0), alpha=200, text_color=(255,255,0), f=big_font)
@@ -305,7 +306,11 @@ def resume_after_insurance():
     p_total = calculate_hand_total(player_hand)
 
     if dealer_has_blackjack():
-        if p_total == 21:
+        if p_total == 21 and insurance_hit == True:
+            chips += bet
+            end_round("Insurance hits, hand pushes") 
+    
+        elif p_total == 21:
             chips += bet
             end_round("Push")
         else:
@@ -314,7 +319,7 @@ def resume_after_insurance():
 
     # normal blackjack check after insurance
     if p_total == 21:
-        winnings = bet * 2.5
+        winnings = (bet * 3) // 2
         chips += winnings
         end_round(f"Blackjack! You won {winnings} chips!")
 
@@ -351,33 +356,58 @@ def start_round():
     deal(player_hand)
     deal(dealer_hand)
     # FORCE DEALER UP CARD TO ACE (TESTING ONLY)
-    dealer_hand[0] = ("Ace", dealer_hand[0][1])
+    # dealer_hand[0] = ("Ace", "spades")
+    # dealer_hand[1] = ("King", "hearts")
 
-# ===== INSURANCE CHECK (ONLY IF PLAYER CAN AFFORD IT) =====
+    # player_hand[0] = ("Ace", "clubs")
+    # player_hand[1] = ("Queen", "diamonds")
+
+    # -----------------------------
+    # INSURANCE PHASE (PAUSE IF NEEDED)
+    # -----------------------------
     if dealer_hand[0][0] == "Ace":
 
         max_insurance = bet // 2
 
-        # only show insurance if player can actually afford it
         if chips >= max_insurance:
             insurance_screen = True
             return
 
-        # otherwise skip insurance entirely
         insurance_screen = False
 
+
+
+
+
+    # -----------------------------
+    # HAND VALUES
+    # -----------------------------
     p_total = calculate_hand_total(player_hand)
 
-    if (p_total == 21 and len(player_hand) == 2) or dealer_has_blackjack():
-        if dealer_has_blackjack() and p_total != 21:
-            result = "Dealer Blackjack!"
-        elif p_total == 21:
-            winnings = bet * 2.5
-            chips += winnings
-            result = f"Blackjack! You won {winnings} chips!"
-        else:
+    p_blackjack = (p_total == 21 and len(player_hand) == 2)
+    d_blackjack = dealer_has_blackjack()
+
+    # -----------------------------
+    # RESOLVE MAIN HAND
+    # -----------------------------
+
+    if insurance_screen:
+        return
+    
+    if p_blackjack or d_blackjack:
+
+        if p_blackjack and d_blackjack:
+            # PUSH (important: NO blackjack payout)
             chips += bet
             result = "Push"
+
+        elif p_blackjack:
+            winnings = (bet * 3) // 2
+            chips += bet + winnings
+            result = f"Blackjack! You won {winnings} chips!"
+
+        else:
+            result = "Dealer Blackjack!"
 
         end_round(result)
 # -----------------------------
@@ -513,17 +543,17 @@ while running:
 
                         insurance_bet = bet // 2
                         chips -= insurance_bet
-                        insurance_screen = False
 
                         if dealer_has_blackjack():
-                            chips += insurance_bet * 3
-                            end_round("Insurance Wins! Dealer Blackjack")
+                            chips += (insurance_bet * 3) # + bet
+                            insurance_screen = False
+                            insurance_hit = True
+                            #end_round("Insurance Wins! Dealer Blackjack")
                         else:
-                            resume_after_insurance()
+                            insurance_screen = False
 
-                        continue
-
-
+                        resume_after_insurance()
+                        
                     elif insurance_no_rect.collidepoint(mx, my):
 
                         insurance_bet = 0
@@ -531,7 +561,7 @@ while running:
 
                         resume_after_insurance()
 
-                        continue
+                    continue
 
 
                 # ===== NORMAL GAME CLICK HANDLING =====
@@ -607,6 +637,7 @@ while running:
 
             draw_panel("OUT OF CHIPS", (x, y), text_color=(255,0,0), f=big_font)
             draw_panel("Restart game to play again", (x, y + 70))
+        
         else:
             title_w, title_h = big_font.render("Enter Bet:", True, (255,255,255)).get_size()
             input_w, input_h = big_font.render(bet_input if bet_input else " ", True, (255,255,0)).get_size()
