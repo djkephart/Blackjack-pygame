@@ -36,6 +36,10 @@ game_over = False
 show_dealer = False
 end_message = ""
 
+insurance_screen = False
+insurance_error = ""
+insurance_bet = 0
+
 # ===== ADDED FOR DOUBLE DOWN =====
 player_locked = False
 
@@ -102,6 +106,8 @@ play_again_rect = pygame.Rect(560, 400, 180, 60)
 
 # ===== ADDED DOUBLE BUTTON =====
 double_rect = pygame.Rect(1100, 470, 100, 50)
+insurance_yes_rect = pygame.Rect(450, 350, 120, 60)
+insurance_no_rect = pygame.Rect(700, 350, 120, 60)
 
 hit_text = font.render("Hit", True, (255,255,255))
 stand_text = font.render("Stand", True, (255,255,255))
@@ -110,6 +116,8 @@ play_again_text = font.render("Play Again", True, (255,255,255))
 # ===== ADDED =====
 double_text = font.render("Double", True, (255,255,255))
 
+insurance_yes_text = font.render("Yes", True, (255,255,255))
+insurance_no_text = font.render("No", True, (255,255,255))
 # -----------------------------
 # GAME STATE
 # -----------------------------
@@ -238,8 +246,22 @@ def render():
         pygame.draw.rect(screen, (0,150,0), play_again_rect)
         screen.blit(play_again_text, (play_again_rect.x + 20, play_again_rect.y + 15))
 
+# ===== INSURANCE PROMPT =====
+    if insurance_screen:
+
+        draw_panel(
+            "INSURANCE? Dealer shows Ace",
+            (420, 250),
+            text_color=(255,255,0),
+            f=big_font
+        )
+
+        draw_button(insurance_yes_rect, (0,150,0), insurance_yes_text)
+        draw_button(insurance_no_rect, (150,0,0), insurance_no_text)
     pygame.display.flip()
 
+    if insurance_error:
+        draw_panel(insurance_error, (400, 250), text_color=(255,0,0))
 # -----------------------------
 # DEAL
 # -----------------------------
@@ -277,17 +299,39 @@ def double_down():
     else:
         dealer_play()
 
+def resume_after_insurance():
+    global chips
+
+    p_total = calculate_hand_total(player_hand)
+
+    if dealer_has_blackjack():
+
+        if p_total == 21:
+            chips += bet
+            end_round("Push")
+        else:
+            end_round("Dealer Blackjack!")
+
+    elif p_total == 21:
+        winnings = bet * 2.5
+        chips += winnings
+        end_round(f"Blackjack! You won {winnings} chips!")
+
 # -----------------------------
 # RESET ROUND
 # -----------------------------
 def reset_round():
     global player_hand, dealer_hand, game_over, show_dealer, player_locked
+    global insurance_screen, insurance_bet
 
     player_hand = []
     dealer_hand = []
     game_over = False
     show_dealer = False
     player_locked = False
+    insurance_screen = False
+    insurance_bet = 0 
+    insurance_error = ""
 
     if cut_triggered:
         reshuffle_deck()
@@ -296,7 +340,7 @@ def reset_round():
 # START ROUND
 # -----------------------------
 def start_round():
-    global chips, bet
+    global chips, bet, insurance_screen
 
     reset_round()
 
@@ -305,6 +349,21 @@ def start_round():
     deal(dealer_hand)
     deal(player_hand)
     deal(dealer_hand)
+    # FORCE DEALER UP CARD TO ACE (TESTING ONLY)
+#    dealer_hand[0] = ("Ace", dealer_hand[0][1])
+
+# ===== INSURANCE CHECK (ONLY IF PLAYER CAN AFFORD IT) =====
+    if dealer_hand[0][0] == "Ace":
+
+        max_insurance = bet // 2
+
+        # only show insurance if player can actually afford it
+        if chips >= max_insurance:
+            insurance_screen = True
+            return
+
+        # otherwise skip insurance entirely
+        insurance_screen = False
 
     p_total = calculate_hand_total(player_hand)
 
@@ -442,25 +501,67 @@ while running:
 
         # -------- GAME --------
         else:
+
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
 
+# ===== INSURANCE CLICK HANDLING =====
+                if insurance_screen:
+
+                    if insurance_yes_rect.collidepoint(mx, my):
+
+                        insurance_bet = bet // 2
+                        chips -= insurance_bet
+                        insurance_screen = False
+
+                        # dealer has blackjack → insurance pays 2:1 (net +3x already includes stake return in your logic style)
+                        if dealer_has_blackjack():
+                            chips += insurance_bet * 3
+                            end_round("Insurance Wins! Dealer Blackjack")
+                            continue
+
+                        continue
+
+
+                    elif insurance_no_rect.collidepoint(mx, my):
+
+                        insurance_bet = 0
+                        insurance_screen = False
+
+                        # resolve blackjack immediately if it exists
+                        if dealer_has_blackjack():
+                            p_total = calculate_hand_total(player_hand)
+
+                            if p_total == 21:
+                                chips += bet
+                                end_round("Push (Both Blackjack)")
+                            else:
+                                end_round("Dealer Blackjack!")
+
+                        continue
+
+
+                # ===== NORMAL GAME CLICK HANDLING =====
                 if game_over:
                     if play_again_rect.collidepoint(mx, my):
                         bet_screen = True
                         bet_input = ""
                         bet_error = ""
                 else:
+
                     if hit_rect.collidepoint(mx, my):
                         if player_locked:
                             continue
+
                         deal(player_hand)
+
                         if calculate_hand_total(player_hand) > 21:
                             end_round("You Bust! Dealer Wins")
 
                     elif stand_rect.collidepoint(mx, my):
                         if player_locked:
                             continue
+
                         dealer_play()
 
                     elif double_rect.collidepoint(mx, my):
@@ -529,4 +630,3 @@ while running:
         render()
 
 pygame.quit()
-#test email fix
